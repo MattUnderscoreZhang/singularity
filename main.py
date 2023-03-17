@@ -73,7 +73,36 @@ def feed_in_codebase(model: str, temperature: float) -> None:
                     "role": "assistant",
                     "content": "ok",
                 })
-    start_conversation(messages, model, temperature)
+    suggest_code(messages, model, temperature)
+
+
+# TODO: work in progress
+def generate_code(messages: List[Dict[str, str]], model: str, temperature: float) -> str:
+    response = openai.Completion.create(
+        engine=model,
+        prompt='\n'.join([m['content'] for m in messages]),
+        max_tokens=1024,
+        n=1,
+        stop=None,
+        temperature=temperature,
+    )
+    return response.choices[0].text.strip()
+
+
+# TODO: work in progress
+def suggest_code(messages: List[Dict[str, str]], model: str, temperature: float) -> None:
+    print(f"GPT is suggesting code based on your conversation with {model}.\n")
+    generated_code = generate_code(messages, model, temperature)
+    print(f"GPT suggested the following code:\n{generated_code}\n")
+    response = input("Would you like to accept this code? (y/n): ").strip().lower()
+    if response == "y":
+        filename = input("Please enter a filename for this code (include the .py extension): ").strip()
+        filepath = os.path.join(os.getcwd(), filename)
+        with open(filepath, "w") as f:
+            f.write(generated_code)
+            pretty_print(f"Wrote generated code to {filepath}", "cyan")
+    else:
+        pretty_print("No code was saved.", "yellow")
 
 
 if __name__ == "__main__":
@@ -89,7 +118,7 @@ if __name__ == "__main__":
         if choice == "1":
             start_conversation([], args.model, args.temperature)
         elif choice == "2":
-            feed_in_codebase(args.model, args.temperature)
+            feed_in_codebase(model='code-davinci-002', temperature=args.temperature)
         elif choice == "3":
             break
         else:
