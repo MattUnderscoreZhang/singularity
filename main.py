@@ -20,7 +20,7 @@ args = parser.parse_args()
 
 
 def pretty_print(content, color, indent=0):
-    wrapper = textwrap.TextWrapper(initial_indent=" " * indent, subsequent_indent=" " * indent, width=80)
+    wrapper = textwrap.TextWrapper(initial_indent=" " * indent, subsequent_indent=" " * indent, width=150)
     parts = content.split("```")
     for i, part in enumerate(parts):
         if i % 2 == 0: print(colored(wrapper.fill(part), color))
@@ -59,20 +59,23 @@ def feed_in_codebase(model: str, temperature: float) -> None:
         "role": "user",
         "content": "I'm going to give you a set of Python files, then ask you questions afterwards. Simply respond to each new file with 'ok' until I finish."
     }]
-    for filename in os.listdir(directory):
-        filepath = os.path.join(directory, filename)
-        if os.path.isfile(filepath) and filepath.endswith(".py"):
-            pretty_print(f"Reading file: {filepath}", "cyan")
-            with open(filepath, "r") as f:
-                code = f.read()
-                messages.append({
-                    "role": "user",
-                    "content": f"Here is the code for {filename}:\n\n" + code,
-                })
-                messages.append({
-                    "role": "assistant",
-                    "content": "ok",
-                })
+    # make this recursive
+    for root, _, files in os.walk(directory):
+        if '.venv' in root: continue
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            if os.path.isfile(filepath) and filepath.endswith(".py"):
+                pretty_print(f"Reading file: {filepath}", "cyan")
+                with open(filepath, "r") as f:
+                    code = f.read()
+                    messages.append({
+                        "role": "user",
+                        "content": f"Here is the code for {filename}:\n\n" + code,
+                    })
+                    messages.append({
+                        "role": "assistant",
+                        "content": "ok",
+                    })
     start_chat(messages, model, temperature)
 
 
