@@ -40,7 +40,7 @@ def talk_to_gpt(messages: List[Dict[str, str]], model: str, temperature: float) 
 
 
 # Start a conversation with GPT
-def start_conversation(messages: List[Dict[str, str]], model: str, temperature: float) -> None:
+def start_chat(messages: List[Dict[str, str]], model: str, temperature: float) -> None:
     print(f"You are now talking to the {model} GPT model. Enter '/exit' to end the conversation.\n")
     while True:
         user_input = input(colored("You: ", "green"))
@@ -73,7 +73,7 @@ def feed_in_codebase(model: str, temperature: float) -> None:
                     "role": "assistant",
                     "content": "ok",
                 })
-    suggest_code(messages, model, temperature)
+    start_chat(messages, model, temperature)
 
 
 # TODO: work in progress
@@ -105,7 +105,7 @@ def suggest_code(messages: List[Dict[str, str]], model: str, temperature: float)
         pretty_print("No code was saved.", "yellow")
 
 
-if __name__ == "__main__":
+def main():
     pretty_print("Welcome to the GPT command-line interface!", "cyan")
     while True:
         print(
@@ -116,10 +116,15 @@ if __name__ == "__main__":
         )
         choice = input(colored("Your choice (1/2/3): ", "green"))
         if choice == "1":
-            start_conversation([], args.model, args.temperature)
+            start_chat([], args.model, args.temperature)
         elif choice == "2":
-            feed_in_codebase(model='code-davinci-002', temperature=args.temperature)
+            # feed_in_codebase(model='code-davinci-002', temperature=args.temperature)
+            feed_in_codebase(model=args.model, temperature=args.temperature)
         elif choice == "3":
             break
         else:
             pretty_print("Invalid choice. Please choose again.", "red")
+
+
+if __name__ == "__main__":
+    main()

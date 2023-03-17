@@ -1,1 +1,5 @@
 .env
+*.lock
+__pypackages__
+.venv
+*.pyc
