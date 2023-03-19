@@ -9,9 +9,12 @@ from gpt_assist.logs import Log, print
 
 def show_code(directory: Path, rel_filepath: Path, cls_name: str, fn_name: str) -> str:
     with open(directory / rel_filepath) as f:
-        root = ast.parse(f.read())
+        file_contents = f.read()
+        root = ast.parse(file_contents)
 
-    if cls_name == "":
+    if cls_name == "" and fn_name == "":
+        return file_contents
+    elif cls_name == "":
         for node in root.body:
             if isinstance(node, ast.FunctionDef):
                 if node.name == fn_name:

@@ -1,5 +1,8 @@
 import builtins
 from dataclasses import dataclass, field
+import os
+from pathlib import Path
+import pickle as pk
 from termcolor import colored
 import textwrap
 import tiktoken
@@ -29,7 +32,7 @@ class Log:
         self.log.append(message)
         if self.length > self.prune_trigger:
             self.prune()
-        # autosave
+        # TODO: autosave
 
     def __str__(self) -> str:
         return "\n".join([str(message) for message in self.log])
@@ -39,9 +42,13 @@ class Log:
         if new_log.length > self.prune_trigger:
             new_log.prune()
         return new_log
-        # autosave
+        # TODO: autosave
 
-    # add save function
+    def __save__(self):
+        save_dir = Path(os.getcwd()) / "saved_logs"
+        n_saved_logs = len([f for f in os.listdir(save_dir) if os.path.isfile(f)])
+        save_path = save_dir / f"log_{n_saved_logs}.txt"
+        pk.dump(self, open(save_path, "wb"))
 
     @property
     def length(self) -> int:
@@ -93,7 +100,12 @@ class Log:
         return messages
 
 
-def print(content: Any = "", color: str = Colors.info, indent: int = 0):
+def load_log(file_path: Path) -> Log:
+    with open(file_path, "rb") as f:
+        return pk.load(f)
+
+
+def print(content: Any = "", color: str = Colors.info, indent: int = 0, end: str = '\n'):
     content = str(content)
     wrapper = textwrap.TextWrapper(
         initial_indent=" " * indent,
@@ -103,5 +115,5 @@ def print(content: Any = "", color: str = Colors.info, indent: int = 0):
     parts = content.split("```")
     for i, part in enumerate(parts):
         # if i % 2 == 0: builtins.print(colored(wrapper.fill(part), color))
-        if i % 2 == 0: builtins.print(colored(part, color))
-        else: builtins.print(colored(part, Colors.code))
+        if i % 2 == 0: builtins.print(colored(part, color), end=end)
+        else: builtins.print(colored(part, Colors.code), end=end)

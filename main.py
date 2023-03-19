@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 import openai
 import os
 from pathlib import Path
-from termcolor import colored
 
+from gpt_assist.autocomplete import prompt
 from gpt_assist.code import show_code, summarize_codebase
 from gpt_assist.color_scheme import Colors
 from gpt_assist.gpt import gpt_api
@@ -33,25 +33,6 @@ class LoopStatus(Enum):
 def parse_user_input(user_input: str, log: Log) -> LoopStatus:
     if user_input == "/exit":
         return LoopStatus.Break
-    elif user_input == "/help":
-        print(
-            "/exit: end the conversation\n"
-            "/help: show this help message\n"
-            "/log: show the conversation log\n"
-            "/clear: clear log\n"
-            "/code: upload codebase from current directory\n"
-            # TODO: add terminal autocompletion for files
-            "/show <filepath>:<class>:<function> show code snippet\n"
-                "    Examples:\n"
-                "    /show main.py:Dog:bark\n"
-                "    /show main.py::list_animals\n"
-                "    /show main.py:Cat:\n"
-            "/back: rewind chat to previous user message\n",
-            # TODO: add /write to take last code and call write_code
-            # TODO: add /load function
-            Colors.info
-        )
-        return LoopStatus.Continue
     elif user_input == "/log":
         print(log, Colors.info)
         print(f"Log contains {log.length} tokens.", Colors.alert)
@@ -88,7 +69,11 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         # TODO: add error handling
         directory = Path(os.getcwd())
         show_args = user_input.split()[1].split(':')
-        code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
+        code = (
+            show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
+            if len(show_args) == 3
+            else show_code(directory, Path(show_args[0]), "", "")
+        )
         message = Message(
             role="user",
             content="```\n" + code + "```",
@@ -96,11 +81,13 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         log.append(message)
         print(message, Colors.info)
         return LoopStatus.Continue
-    elif user_input == "/back":
+    elif user_input == "/undo":
         while log.length > 0:
             message = log.pop()
             if message.role == "user":
                 break
+        print(f"Rewound to state of last message.", Colors.info)
+        print()
         return LoopStatus.Continue
     else:
         log.append(
@@ -114,7 +101,7 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
 
 def parse_gpt_response(response: str, log: Log) -> LoopStatus:
     if response.startswith('/show'):
-        user_input = input(colored("Show GPT code? (y/n): ", Colors.user))
+        user_input = prompt("Show GPT code? (y/n): ")
         if user_input.lower() == "y":
             directory = Path(os.getcwd())
             show_args = response.split()[1].split(':')
@@ -140,13 +127,14 @@ def parse_gpt_response(response: str, log: Log) -> LoopStatus:
 
 def main():
     print(
-        f"You are now talking to the {args.model} GPT model. "
-        "Enter '/exit' to end the conversation or '/help' for help.\n",
+        f"You are now talking to the {args.model} GPT model.\n"
+        "Enter '/exit' to end the conversation.\n",
         Colors.info
     )
     log = Log(args.model)
     while True:
-        user_input = input(colored("You: ", Colors.user))
+        # no newline
+        user_input = prompt("You: ")
         loop_status = parse_user_input(user_input, log)
         if loop_status == LoopStatus.Break:
             break
