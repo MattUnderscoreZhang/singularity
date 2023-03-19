@@ -9,8 +9,8 @@ from prompt_toolkit.shortcuts import input_dialog
 from gpt_assist.autocomplete import prompt
 from gpt_assist.code import show_code, summarize_codebase
 from gpt_assist.color_scheme import Colors
-from gpt_assist.gpt import gpt_api
-from gpt_assist.logs import Log, Message, print
+from gpt_assist.llm import Message, llm_api
+from gpt_assist.logs import Log, get_title, print
 
 
 load_dotenv()  # Load the OpenAI API key from a .env file
@@ -20,7 +20,8 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # Define command-line arguments
 parser = argparse.ArgumentParser(description="Talk to GPT")
 # parser.add_argument("--model", type=str, default="gpt-4", help="GPT model to use")
-parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="GPT model to use")
+# parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="GPT model to use")
+parser.add_argument("--model", type=str, default="text-davinci-003", help="GPT model to use")
 parser.add_argument("--temperature", type=float, default=1, help="Sampling temperature for generating text")
 args = parser.parse_args()
 
@@ -37,18 +38,25 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
     elif user_input == "/log":
         log.print()
         return LoopStatus.Continue
+    elif user_input.startswith("/name"):
+        name = " ".join(user_input.split()[1:])
+        log.rename(name)
+        return LoopStatus.Continue
     elif user_input == "/load":
         save_dir = Path("saved_logs")
         saved_logs = [f for f in os.listdir(save_dir)]
         logs_text = "\n".join([
-            f"{i}: {f}"
+            f"{i}: {get_title(save_dir / Path(f))}"
             for i, f in enumerate(saved_logs)
         ])  + "\n\nSelect saved log: "
         result = input_dialog(title="Select saved log", text=logs_text).run()
-        if int(result) < len(saved_logs):
-            log.load(save_dir / saved_logs[int(result)])
+        if result is None:
+            print("No log loaded.\n", Colors.alert)
         else:
-            print("Invalid selection.\n", Colors.alert)
+            try:
+                log.load(save_dir / saved_logs[int(result)])
+            except Exception:
+                print("Invalid selection.\n", Colors.alert)
         return LoopStatus.Continue
     elif user_input == "/clear":
         log.clear()
@@ -134,7 +142,7 @@ def parse_gpt_response(response: str, log: Log) -> LoopStatus:
 
 def main():
     print(
-        f"You are now talking to the {args.model} GPT model.\n"
+        f"You are now talking to the {args.model} GPT model. "
         "Enter '/exit' to end the conversation.\n",
         Colors.info
     )
@@ -147,8 +155,8 @@ def main():
             break
         elif loop_status == LoopStatus.Continue:
             continue
-        response = gpt_api(log.to_messages(), args.model, args.temperature)
-        print(f"\nGPT: {response}\n", Colors.gpt, indent=2)
+        response = llm_api(log.log, args.model, args.temperature)
+        print(f"\nGPT: {response}\n", Colors.assistant, indent=2)
         log.append(
             Message(
                 role="assistant",

@@ -9,6 +9,7 @@ from gpt_assist.color_scheme import prompt_style
 commands = [
     ("/exit", "end the conversation"),
     ("/log", "show the conversation log"),
+    ("/name", "[name] change the conversation name"),
     ("/load", "load conversation log from file"),
     ("/clear", "clear log"),
     ("/code", "upload codebase from current directory"),
@@ -25,9 +26,11 @@ class CommandCompleter(Completer):
 
         # Suggest filepaths if "/show" is typed
         if (
-            (len(words_before_cursor) == 1 and current_word == "")
-            or
-            (len(words_before_cursor) == 2 and words_before_cursor[0] == "/show")
+            (
+                (len(words_before_cursor) == 1 and current_word == "")
+                or (len(words_before_cursor) == 2)
+            )
+            and words_before_cursor[0] == "/show"
         ):
             path = "".join(words_before_cursor[1:])
             suggestions = [

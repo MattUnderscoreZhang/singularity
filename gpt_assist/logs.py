@@ -6,28 +6,19 @@ import pickle as pk
 from termcolor import colored
 import textwrap
 import tiktoken
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from gpt_assist.color_scheme import Colors
-from gpt_assist.gpt import gpt_api
-
-
-@dataclass
-class Message:
-    role: str
-    content: str
-    persist: bool = False
-
-    def __str__(self) -> str:
-        return f"{self.role}: {self.content}"
+from gpt_assist.llm import Message, llm_api
 
 
 @dataclass
 class Log:
     model: str
     log: List[Message] = field(default_factory=list)
-    prune_trigger: int = 3500
-    save_name: Optional[str] = None
+    prune_trigger: int = 500
+    filename: Optional[str] = None
+    title: Optional[str] = None
 
     def append(self, message: Message) -> None:
         self.log.append(message)
@@ -50,20 +41,28 @@ class Log:
         save_dir = Path(os.getcwd()) / "saved_logs"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        if self.save_name is None:
-            n_saved_logs = len([f for f in os.listdir(save_dir) if os.path.isfile(f)])
-            self.save_name = f"log_{n_saved_logs}"
-        save_path = save_dir / f"{self.save_name}.txt"
+        if self.filename is None:
+            n_saved_logs = len([f for f in os.listdir(save_dir)])
+            self.filename = f"log_{n_saved_logs}"
+        save_path = save_dir / f"{self.filename}.txt"
+        if self.title is None:
+            self.title = self.filename
         pk.dump(self, open(save_path, "wb"))
 
-    def load(self, file_path: Path):
-        with open(file_path, "rb") as f:
+    def rename(self, new_name: str) -> None:
+        self.title = new_name
+        print(f"Renamed log to {new_name}\n", Colors.alert)
+        self.__save__()
+
+    def load(self, filepath: Path):
+        with open(filepath, "rb") as f:
             loaded_log = pk.load(f)
             self.model = loaded_log.model
             self.log = loaded_log.log
             self.prune_trigger = loaded_log.prune_trigger
-            self.save_name = loaded_log.save_name
-        print(f"Loaded log from {file_path}", Colors.alert)
+            self.filename = loaded_log.filename
+            self.title = loaded_log.title
+        print(f"Loaded '{loaded_log.title}'", Colors.alert)
         print()
 
     @property
@@ -119,23 +118,37 @@ class Log:
                 ),
             )
         )
-        summary = gpt_api(Log(self.model, messages).to_messages(), self.model, 1)
-        new_log = [
-            message
-            for message in self.log
-            if message.persist
-        ] + [Message(role="user", content=summary)] + self.log[-5:]
-        self.log = new_log
+        print("Pruning log...", Colors.alert)
+        try:
+            summary = "Summary of chat: " + llm_api(messages, self.model, 1)
+            new_log = [
+                message
+                for message in self.log
+                if message.persist
+            ] + [Message(role="assistant", content=summary)]
+            enc = tiktoken.encoding_for_model(self.model)
+            new_log_length = sum([
+                len(enc.encode(message.content))
+                for message in new_log
+            ])
+            n_messages_kept = 0
+            messages.pop()
+            kept_messages_length = len(enc.encode(messages[-1].content))
+            while kept_messages_length + new_log_length < self.prune_trigger:
+                n_messages_kept += 1
+                kept_messages_length += len(enc.encode(messages[-n_messages_kept-1].content))
+            min_messages_kept = 3
+            new_log += messages[-max(n_messages_kept, min_messages_kept):]
+            self.log = new_log
+            print("Pruning successful.\n", Colors.alert)
+        except Exception:
+            print("Failed to prune log.\n", Colors.alert)
 
-    def to_messages(self) -> List[Dict]:
-        messages = [
-            {
-                "role": m.role,
-                "content": m.content
-            }
-            for m in self.log
-        ]
-        return messages
+
+def get_title(filepath: Path) -> str:
+    with open(filepath, "rb") as f:
+        loaded_log = pk.load(f)
+        return loaded_log.title
 
 
 def print(content: Any = "", color: str = Colors.info, indent: int = 0, end: str = '\n'):

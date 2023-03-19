@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 class Colors(NamedTuple):
     info = "blue"
-    gpt = "magenta"
+    assistant = "magenta"
     alert = "yellow"
     warning = "red"
     code = "cyan"
