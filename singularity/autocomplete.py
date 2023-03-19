@@ -3,7 +3,7 @@ from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 from prompt_toolkit import shortcuts
 
-from gpt_assist.color_scheme import prompt_style
+from singularity.color_scheme import prompt_style
 
 
 commands = [

@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 from typing import List
 
-from gpt_assist.color_scheme import Colors
-from gpt_assist.logs import Log, print
+from singularity.color_scheme import Colors
+from singularity.logs import Log, print
 
 
 def show_code(directory: Path, rel_filepath: Path, cls_name: str, fn_name: str) -> str:
@@ -169,9 +169,9 @@ def summarize_codebase(docstrings: bool = False) -> str:
 
 # TODO: work in progress
 def suggest_code(log: Log, model: str, temperature: float) -> None:
-    print(f"GPT is suggesting code based on your conversation with {model}.\n", Colors.info)
+    print(f"Assistant is suggesting code based on your conversation with {model}.\n", Colors.info)
     generated_code = generate_code(log, model, temperature)
-    print(f"GPT suggested the following code:\n{generated_code}\n", Colors.info)
+    print(f"Assistant suggested the following code:\n{generated_code}\n", Colors.info)
     response = input("Would you like to accept this code? (y/n): ").strip().lower()
     if response == "y":
         filename = input("Please enter a filename for this code (include the .py extension): ").strip()

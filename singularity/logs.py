@@ -8,15 +8,15 @@ import textwrap
 import tiktoken
 from typing import Any, List, Optional
 
-from gpt_assist.color_scheme import Colors
-from gpt_assist.llm import Message, llm_api
+from singularity.color_scheme import Colors
+from singularity.llm import Message, llm_api
 
 
 @dataclass
 class Log:
     model: str
     log: List[Message] = field(default_factory=list)
-    prune_trigger: int = 500
+    prune_trigger: int = 3500
     filename: Optional[str] = None
     title: Optional[str] = None
 

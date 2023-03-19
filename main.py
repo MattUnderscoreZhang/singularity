@@ -6,11 +6,11 @@ import os
 from pathlib import Path
 from prompt_toolkit.shortcuts import input_dialog
 
-from gpt_assist.autocomplete import prompt
-from gpt_assist.code import show_code, summarize_codebase
-from gpt_assist.color_scheme import Colors
-from gpt_assist.llm import Message, llm_api
-from gpt_assist.logs import Log, get_title, print
+from singularity.autocomplete import prompt
+from singularity.code import show_code, summarize_codebase
+from singularity.color_scheme import Colors
+from singularity.llm import Message, llm_api
+from singularity.logs import Log, get_title, print
 
 
 load_dotenv()  # Load the OpenAI API key from a .env file
@@ -18,10 +18,10 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 # Define command-line arguments
-parser = argparse.ArgumentParser(description="Talk to GPT")
-# parser.add_argument("--model", type=str, default="gpt-4", help="GPT model to use")
-# parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="GPT model to use")
-parser.add_argument("--model", type=str, default="text-davinci-003", help="GPT model to use")
+parser = argparse.ArgumentParser(description="Talk to LLM assistant")
+# parser.add_argument("--model", type=str, default="gpt-4", help="model to use")
+parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="model to use")
+# parser.add_argument("--model", type=str, default="text-davinci-003", help="model to use")
 parser.add_argument("--temperature", type=float, default=1, help="Sampling temperature for generating text")
 args = parser.parse_args()
 
@@ -114,9 +114,9 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         return LoopStatus.NoAction
 
 
-def parse_gpt_response(response: str, log: Log) -> LoopStatus:
+def parse_response(response: str, log: Log) -> LoopStatus:
     if response.startswith('/show'):
-        user_input = prompt("Show GPT code? (y/n): ")
+        user_input = prompt("Show assistant code? (y/n): ")
         if user_input.lower() == "y":
             directory = Path(os.getcwd())
             show_args = response.split()[1].split(':')
@@ -142,7 +142,7 @@ def parse_gpt_response(response: str, log: Log) -> LoopStatus:
 
 def main():
     print(
-        f"You are now talking to the {args.model} GPT model. "
+        f"You are now talking to the {args.model} model. "
         "Enter '/exit' to end the conversation.\n",
         Colors.info
     )
@@ -156,14 +156,14 @@ def main():
         elif loop_status == LoopStatus.Continue:
             continue
         response = llm_api(log.log, args.model, args.temperature)
-        print(f"\nGPT: {response}\n", Colors.assistant, indent=2)
+        print(f"\nassistant: {response}\n", Colors.assistant, indent=2)
         log.append(
             Message(
                 role="assistant",
                 content=response.strip(),
             )
         )
-        parse_gpt_response(response, log)
+        parse_response(response, log)
 
 
 if __name__ == "__main__":

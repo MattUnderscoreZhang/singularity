@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "gpt-assist"
+name = "singularity"
 version = "0.1.0"
 description = ""
 authors = ["Matt Zhang <set.stun@gmail.com>"]
 readme = "README.md"
-packages = [{include = "gpt_assist"}]
+packages = [{include = "singularity"}]
 
 [tool.poetry.dependencies]
 python = "^3.9"
