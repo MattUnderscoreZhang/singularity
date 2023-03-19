@@ -2,6 +2,7 @@ import ast
 import os
 from pathlib import Path
 
+from gpt_assist.color_scheme import colors
 from gpt_assist.logs import Log, Message, print
 
 
@@ -85,7 +86,7 @@ def summarize_code(directory: Path, rel_filepath: Path, docstrings: bool = False
 
 
 # Feed a directory of code files to GPT
-def summarize_codebase() -> Message:
+def summarize_codebase() -> str:
     directory = Path(os.getcwd())
     codebase_summary = ""
     for root, _, filenames in os.walk(directory):
@@ -94,41 +95,26 @@ def summarize_codebase() -> Message:
             if not filename.endswith(".py"): continue
             filepath = os.path.join(root, filename)
             rel_filepath = Path(filepath).resolve().relative_to(directory)
-            print(f"Summarizing file: {rel_filepath}", "cyan")
+            print(f"Summarizing file: {rel_filepath}", colors.info)
             file_summary = summarize_code(directory, rel_filepath)
             codebase_summary += file_summary
-    message = Message(
-        role="user",
-        content=(
-            "'''\n" + codebase_summary + "\n'''\n\n" +
-            "This is a high-level codebase overview. You will need to see code in more detail "
-            "in order to answer questions. To do so, use the following command. Do not include "
-            "any additional text or quotes when running the command.\n\n"
-            "/show <filepath>:<class>:<function>\n\n"
-            "Examples:\n"
-            "/show main.py:Dog:bark\n"
-            "/show main.py::list_animals\n"
-            "/show main.py:Cat:\n"
-        ),
-        preamble=True,
-    )
-    return message
+    return codebase_summary
 
 
 # TODO: work in progress
 def suggest_code(log: Log, model: str, temperature: float) -> None:
-    print(f"GPT is suggesting code based on your conversation with {model}.\n")
+    print(f"GPT is suggesting code based on your conversation with {model}.\n", colors.info)
     generated_code = generate_code(log, model, temperature)
-    print(f"GPT suggested the following code:\n{generated_code}\n")
+    print(f"GPT suggested the following code:\n{generated_code}\n", colors.info)
     response = input("Would you like to accept this code? (y/n): ").strip().lower()
     if response == "y":
         filename = input("Please enter a filename for this code (include the .py extension): ").strip()
         filepath = os.path.join(os.getcwd(), filename)
         with open(filepath, "w") as f:
             f.write(generated_code)
-            print(f"Wrote generated code to {filepath}", "cyan")
+            print(f"Wrote generated code to {filepath}", colors.info)
     else:
-        print("No code was saved.", "yellow")
+        print("No code was saved.", colors.info)
 
 
 # TODO: work in progress

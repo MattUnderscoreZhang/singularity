@@ -7,6 +7,7 @@ from pathlib import Path
 from termcolor import colored
 
 from gpt_assist.code import show_code, summarize_codebase
+from gpt_assist.color_scheme import colors
 from gpt_assist.gpt import gpt_api
 from gpt_assist.logs import Log, Message, print
 
@@ -37,37 +38,58 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             "/exit: end the conversation\n"
             "/help: show this help message\n"
             "/log: show the conversation log\n"
+            "/clear: clear log\n"
             "/code: upload codebase from current directory\n"
             "/show <filepath>:<class>:<function> show code snippet\n"
                 "    Examples:\n"
                 "    /show main.py:Dog:bark\n"
                 "    /show main.py::list_animals\n"
-                "    /show main.py:Cat:\n"
+                "    /show main.py:Cat:\n",
+            colors.info
         )
         return LoopStatus.Continue
     elif user_input == "/log":
-        print(log)
-        print(f"Log contains {log.length} tokens.", "yellow")
+        print(log, colors.info)
+        print(f"Log contains {log.length} tokens.", colors.alert)
+        print()
+        return LoopStatus.Continue
+    elif user_input == "/clear":
+        log.log = []
+        print("Log cleared.", colors.alert)
         print()
         return LoopStatus.Continue
     elif user_input.startswith("/code"):
-        message = summarize_codebase()
+        codebase_summary = summarize_codebase()
+        message = Message(
+            role="user",
+            content=(
+                "```\n" + codebase_summary + "```" +
+                "This is a high-level codebase overview. You will need to see code in more detail "
+                "in order to answer questions. To do so, use the following command. Do not include "
+                "any additional text or quotes when running the command.\n\n"
+                "/show <filepath>:<class>:<function>\n\n"
+                "Examples:\n"
+                "/show main.py:Dog:bark\n"
+                "/show main.py::list_animals\n"
+                "/show main.py:Cat:\n"
+            ),
+            preamble=True,
+        )
         log.append(message)
-        print(f"Log contains {log.length} tokens.", "yellow")
+        print(f"Log contains {log.length} tokens.", colors.info)
         print()
-        print(log)
         return LoopStatus.Continue
     elif user_input.startswith("/show"):
         directory = Path(os.getcwd())
         show_args = user_input.split()[1].split(':')
         code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
-        print(code)
-        log.append(
-            Message(
-                role="user",
-                content=code,
-            )
+        message = Message(
+            role="user",
+            content="```\n" + code + "\n```\n",
         )
+        log.append(message)
+        print(message, colors.info)
+        print()
         return LoopStatus.Continue
     else:
         log.append(
@@ -81,12 +103,12 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
 
 def parse_gpt_response(response: str, log: Log) -> LoopStatus:
     if response.startswith('/show'):
-        user_input = input(colored("Show GPT code? (y/n): ", "cyan"))
+        user_input = input(colored("Show GPT code? (y/n): ", colors.user))
         if user_input.lower() == "y":
             directory = Path(os.getcwd())
             show_args = response.split()[1].split(':')
             code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
-            print(code)
+            print(code, colors.info)
             log.append(
                 Message(
                     role="user",
@@ -108,18 +130,19 @@ def parse_gpt_response(response: str, log: Log) -> LoopStatus:
 def main():
     print(
         f"You are now talking to the {args.model} GPT model. "
-        "Enter '/exit' to end the conversation or '/help' for help.\n"
+        "Enter '/exit' to end the conversation or '/help' for help.\n",
+        colors.info
     )
     log = Log()
     while True:
-        user_input = input(colored("You: ", "green"))
+        user_input = input(colored("You: ", colors.user))
         loop_status = parse_user_input(user_input, log)
         if loop_status == LoopStatus.Break:
             break
         elif loop_status == LoopStatus.Continue:
             continue
         response = gpt_api(log.to_messages(), args.model, args.temperature)
-        print(f"\nGPT: {response}\n", "yellow", indent=2)
+        print(f"\nGPT: {response}\n", colors.gpt, indent=2)
         log.append(
             Message(
                 role="assistant",

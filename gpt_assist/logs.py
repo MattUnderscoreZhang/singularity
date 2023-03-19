@@ -4,6 +4,7 @@ from termcolor import colored
 import textwrap
 from typing import Any, Dict, List
 
+from gpt_assist.color_scheme import colors
 from gpt_assist.gpt import gpt_api
 
 
@@ -83,7 +84,7 @@ class Log:
         return messages
 
 
-def print(content: Any = "", color: str = 'cyan', indent: int = 0):
+def print(content: Any = "", color: str = colors.info, indent: int = 0):
     content = str(content)
     wrapper = textwrap.TextWrapper(
         initial_indent=" " * indent,
@@ -94,4 +95,4 @@ def print(content: Any = "", color: str = 'cyan', indent: int = 0):
     for i, part in enumerate(parts):
         # if i % 2 == 0: builtins.print(colored(wrapper.fill(part), color))
         if i % 2 == 0: builtins.print(colored(part, color))
-        else: builtins.print(part)
+        else: builtins.print(colored(part, colors.code))
