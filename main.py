@@ -2,12 +2,12 @@ import argparse
 from dotenv import load_dotenv
 import openai
 import os
+from pathlib import Path
 from termcolor import colored
-from typing import Dict, List
 
-from gpt_assist.code import feed_in_codebase
-from gpt_assist.logs import Log, print
-from gpt_assist.gpt import start_chat
+from gpt_assist.code import load_code, summarize_codebase
+from gpt_assist.gpt import gpt_api
+from gpt_assist.logs import Log, Message, print
 
 
 load_dotenv()  # Load the OpenAI API key from a .env file
@@ -22,38 +22,62 @@ parser.add_argument("--temperature", type=float, default=1, help="Sampling tempe
 args = parser.parse_args()
 
 
-# TODO: work in progress
-def generate_code(log: Log, model: str, temperature: float) -> str:
-    response = openai.Completion.create(
-        engine=model,
-        prompt='\n'.join([m['content'] for m in log]),
-        max_tokens=1024,
-        n=1,
-        stop=None,
-        temperature=temperature,
-    )
-    return response.choices[0].text.strip()
-
-
 def main():
-    print("Welcome to the GPT command-line interface!", "cyan")
+    print(
+        f"You are now talking to the {args.model} GPT model. "
+        "Enter '/exit' to end the conversation or '/help' for help.\n"
+    )
+    log = Log()
     while True:
-        print(
-            "Please choose an option:\n"
-            "1. Start a new chat\n"
-            "2. Work in current codebase\n"
-            "3. Exit"
-        )
-        choice = input(colored("Your choice (1/2/3): ", "green"))
-        print()
-        if choice == "1":
-            start_chat([], args.model, args.temperature)
-        elif choice == "2":
-            feed_in_codebase(model=args.model, temperature=args.temperature)
-        elif choice == "3":
+        user_input = input(colored("You: ", "green"))
+        if user_input == "/exit":
             break
+        elif user_input == "/help":
+            print(
+                "/exit: end the conversation\n"
+                "/help: show this help message\n"
+                "/log: show the conversation log\n"
+                "/code: upload codebase from current directory\n"
+                "/upload: upload code (relative filepath)\n"
+            )
+            continue
+        elif user_input == "/log":
+            print(log)
+            print(f"Log contains {log.length} tokens.")
+            continue
+        elif user_input.startswith("/code"):
+            message = summarize_codebase()
+            log += Log([message])
+            print(f"Log contains {log.length} tokens.")
+            print()
+            print(log)
+            continue
+        elif user_input.startswith("/upload"):
+            directory = Path(os.getcwd())
+            rel_filepath = Path(user_input.split()[1])
+            log.append(
+                Message(
+                    role="user",
+                    content=load_code(directory, rel_filepath)
+                )
+            )
         else:
-            print("Invalid choice. Please choose again.", "red")
+            log.append(
+                Message(
+                    role="user",
+                    content=user_input.strip(),
+                )
+            )
+        response = gpt_api(log.to_messages(), args.model, args.temperature)
+        print(f"\nGPT: {response}\n", "yellow", indent=2)
+        log.append(
+            Message(
+                role="assistant",
+                content=response.strip(),
+            )
+        )
+
+
 
 
 if __name__ == "__main__":
