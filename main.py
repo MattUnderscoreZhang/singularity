@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import openai
 import os
 from pathlib import Path
+from prompt_toolkit.shortcuts import input_dialog
 
 from gpt_assist.autocomplete import prompt
 from gpt_assist.code import show_code, summarize_codebase
@@ -34,14 +35,23 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
     if user_input == "/exit":
         return LoopStatus.Break
     elif user_input == "/log":
-        print(log, Colors.info)
-        print(f"Log contains {log.length} tokens.", Colors.alert)
-        print()
+        log.print()
+        return LoopStatus.Continue
+    elif user_input == "/load":
+        save_dir = Path("saved_logs")
+        saved_logs = [f for f in os.listdir(save_dir)]
+        logs_text = "\n".join([
+            f"{i}: {f}"
+            for i, f in enumerate(saved_logs)
+        ])  + "\n\nSelect saved log: "
+        result = input_dialog(title="Select saved log", text=logs_text).run()
+        if int(result) < len(saved_logs):
+            log.load(save_dir / saved_logs[int(result)])
+        else:
+            print("Invalid selection.\n", Colors.alert)
         return LoopStatus.Continue
     elif user_input == "/clear":
-        log.log = []
-        print("Log cleared.", Colors.alert)
-        print()
+        log.clear()
         return LoopStatus.Continue
     elif user_input.startswith("/code"):
         codebase_summary = summarize_codebase()
@@ -62,8 +72,7 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             persist=True,
         )
         log.append(message)
-        print(f"Log contains {log.length} tokens.", Colors.info)
-        print()
+        print(f"Log contains {log.length} tokens.\n", Colors.info)
         return LoopStatus.Continue
     elif user_input.startswith("/show"):
         directory = Path(os.getcwd())
@@ -82,16 +91,10 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             print(message, Colors.info)
         return LoopStatus.Continue
     elif user_input == "/undo":
-        while log.length > 0:
-            message = log.pop()
-            if message.role == "user":
-                break
-        print(f"Rewound to state of last message.", Colors.info)
-        print()
+        log.undo()
         return LoopStatus.Continue
     elif user_input.startswith('/'):
-        print(f"Invalid command.", Colors.info)
-        print()
+        print(f"Invalid command.\n", Colors.info)
         return LoopStatus.Continue
     else:
         log.append(

@@ -9,6 +9,7 @@ from gpt_assist.color_scheme import prompt_style
 commands = [
     ("/exit", "end the conversation"),
     ("/log", "show the conversation log"),
+    ("/load", "load conversation log from file"),
     ("/clear", "clear log"),
     ("/code", "upload codebase from current directory"),
     ("/show", "[filepath]:[optional-class]:[optional-function] show code snippet"),

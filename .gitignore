@@ -6,3 +6,4 @@ __pypackages__
 .pdm.toml
 build/
 dist/
+saved_logs/
