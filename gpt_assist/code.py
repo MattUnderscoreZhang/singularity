@@ -1,49 +1,75 @@
 import ast
 import os
-from typing import Dict, List
+from pathlib import Path
 
 from gpt_assist.gpt import start_chat
-from gpt_assist.pprint import print
+from gpt_assist.logs import Log, Message, print
 
 
-def __extract_public_functions(source: str) -> List[str]:
-    tree = ast.parse(source, type_comments=True)
-    fns = []
-    for node in ast.iter_child_nodes(tree):
+def summarize_code(filepath: str, directory: str):
+    """
+    Given a filepath, returns a formatted string that summarizes all public functions 
+    and classes defined in the file. Each function and class is described with its name, 
+    arguments, and docstring, and the string is separated with newlines.
+    
+    Args:
+        filepath: The path of the file to summarize.
+    
+    Returns:
+        A formatted summary string of all public functions and classes, with docstrings.
+    """
+    with open(filepath) as f:
+        root = ast.parse(f.read())
+
+    dir_filepath = Path(directory).resolve()
+    rel_filepath = Path(filepath).resolve().relative_to(dir_filepath)
+
+    funcs_and_classes = [f"{rel_filepath}:"]
+    for node in root.body:
         if isinstance(node, ast.FunctionDef):
-            if not node.name.startswith("_"):
-                fn = f"{node.name}("  # ) for code completion
-                for arg in node.args.args:
-                    fn += f"{arg.arg}: {arg.type_comment}, "
-                if fn.endswith(", "):
-                    fn = fn[:-2]
-                fn += ")"
-                fns.append(fn)
-    return fns
+            if node.name.startswith("_"):
+                continue
+            func_args = [arg.arg for arg in node.args.args]
+            func_doc = ast.get_docstring(node) or ""
+            if func_doc != "":
+                func_doc = f"\n'''\n{func_doc}\n'''".replace("\n", "\n\t")
+            funcs_and_classes.append(f"\t{node.name}({', '.join(func_args)}){func_doc}")
+        elif isinstance(node, ast.ClassDef):
+            if node.name.startswith("_"):
+                continue
+            class_doc = ast.get_docstring(node) or ""
+            if class_doc != "":
+                class_doc = f"\n{class_doc}".replace("\n", "\n\t")
+            funcs_and_classes.append(f"\t{node.name}:{class_doc}")
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef):
+                    if item.name.startswith("_"):
+                        continue
+                    func_args = ["self"] + [arg.arg for arg in item.args.args[1:]]
+                    func_doc = ast.get_docstring(item) or ""
+                    if func_doc != "":
+                        func_doc = f"\n{func_doc}".replace("\n", "\n\t\t")
+                    funcs_and_classes.append(
+                        f"\t\t{item.name}({', '.join(func_args)}){func_doc}"
+                    )
 
-
-# Extract public functions and API from a code file
-def summarize_code(filepath: str) -> str:
-    with open(filepath, "r") as f:
-        source = f.read()
-    fns = __extract_public_functions(source)
-    content = f"{filepath}:\n"
-    for fn in fns:
-        content += f"  {fn}\n"
-    content += "\n"
-    return content
+    return "\n".join(funcs_and_classes) + "\n\n"
 
 
 # Feed a directory of code files to GPT
 def feed_in_codebase(model: str, temperature: float) -> None:
     directory = os.getcwd()
-    messages = [{
-        "role": "user",
-        "content": (
-            "I'm going to summarize some code for you, then ask you questions afterwards."
-            "Reply with 'ok' after you've read the summary."
+    log = Log([
+        Message(
+            role="user",
+            content=(
+                "I'm going to summarize some code for you, then ask you questions afterwards. "
+                "If during conversation I refer to specific code that you want to see, please "
+                "ask me to show it to you."
+            ),
+            preamble=True,
         )
-    }]
+    ])
     codebase_summary = ""
     for root, _, filenames in os.walk(directory):
         if '.venv' in root or '__pycache__' in root: continue
@@ -51,26 +77,23 @@ def feed_in_codebase(model: str, temperature: float) -> None:
             if not filename.endswith(".py"): continue
             filepath = os.path.join(root, filename)
             print(f"Summarizing file: {filepath}", "cyan")
-            file_summary = summarize_code(filepath)
+            file_summary = summarize_code(filepath, directory)
             codebase_summary += file_summary
-    messages.append({
-        "role": "user",
-        "content": codebase_summary,
-    })
-    messages.append({
-        "role": "assistant",
-        "content": "ok",
-    })
-    for message in messages:
-        print(message["role"])
-        print(message["content"])
-    start_chat(messages, model, temperature)
+    log.append(
+        Message(
+            role="user",
+            content=codebase_summary,
+            preamble=True,
+        )
+    )
+    print(log)
+    start_chat(log, model, temperature)
 
 
 # TODO: work in progress
-def suggest_code(messages: List[Dict[str, str]], model: str, temperature: float) -> None:
+def suggest_code(log: Log, model: str, temperature: float) -> None:
     print(f"GPT is suggesting code based on your conversation with {model}.\n")
-    generated_code = generate_code(messages, model, temperature)
+    generated_code = generate_code(log, model, temperature)
     print(f"GPT suggested the following code:\n{generated_code}\n")
     response = input("Would you like to accept this code? (y/n): ").strip().lower()
     if response == "y":

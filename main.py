@@ -6,8 +6,8 @@ from termcolor import colored
 from typing import Dict, List
 
 from gpt_assist.code import feed_in_codebase
+from gpt_assist.logs import Log, print
 from gpt_assist.gpt import start_chat
-from gpt_assist.pprint import print
 
 
 load_dotenv()  # Load the OpenAI API key from a .env file
@@ -23,10 +23,10 @@ args = parser.parse_args()
 
 
 # TODO: work in progress
-def generate_code(messages: List[Dict[str, str]], model: str, temperature: float) -> str:
+def generate_code(log: Log, model: str, temperature: float) -> str:
     response = openai.Completion.create(
         engine=model,
-        prompt='\n'.join([m['content'] for m in messages]),
+        prompt='\n'.join([m['content'] for m in log]),
         max_tokens=1024,
         n=1,
         stop=None,
@@ -45,6 +45,7 @@ def main():
             "3. Exit"
         )
         choice = input(colored("Your choice (1/2/3): ", "green"))
+        print()
         if choice == "1":
             start_chat([], args.model, args.temperature)
         elif choice == "2":
