@@ -1,9 +1,10 @@
 import ast
 import os
 from pathlib import Path
+from typing import List
 
-from gpt_assist.color_scheme import colors
-from gpt_assist.logs import Log, Message, print
+from gpt_assist.color_scheme import Colors
+from gpt_assist.logs import Log, print
 
 
 def show_code(directory: Path, rel_filepath: Path, cls_name: str, fn_name: str) -> str:
@@ -28,65 +29,120 @@ def show_code(directory: Path, rel_filepath: Path, cls_name: str, fn_name: str) 
     return "Code not found."
 
 
+def __get_ast_value(node: ast.AST) -> str:
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, str):
+            return f"'{node.value}'"
+        else:
+            return node.value
+    elif isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Name):
+            return func.id + "()"
+    return ast.dump(node)
+
+
+def __get_ast_function(node: ast.FunctionDef, docstrings: bool, tabs: int) -> str:
+    # TODO: add type annotations and default values
+    func_args = [arg.arg for arg in node.args.args]
+    if docstrings:
+        func_doc = ast.get_docstring(node) or ""
+        if func_doc != "":
+            func_doc = f"\n{func_doc}".replace("\n", "\n" + "\t" * tabs)
+    else:
+        func_doc = ""
+    return "\t" * tabs + f"{node.name}({', '.join(func_args)}){func_doc}"
+
+
+def __get_ast_members(node: ast.ClassDef, tabs: int) -> List[str]:
+    member_strs = []
+    for item in node.body:
+        if isinstance(item, ast.Assign):
+            for target in item.targets:
+                if not isinstance(target, ast.Name):
+                    continue
+                name = target.id
+                if item.value is None:
+                    member_strs.append("\t" * tabs + name)
+                else:
+                    value = __get_ast_value(item.value)
+                    member_strs.append("\t" * tabs + f"{name} = {value}")
+        elif isinstance(item, ast.AnnAssign):
+            if (
+                not isinstance(item.target, ast.Name)
+                or not isinstance(item.annotation, ast.Name)
+            ):
+                continue
+            name = item.target.id
+            type = item.annotation.id
+            if item.value is None:
+                member_strs.append("\t" * tabs + f"{name}: {type}")
+            else:
+                value = __get_ast_value(item.value)
+                member_strs.append("\t" * tabs + f"{name}: {type} = {value}")
+    return member_strs
+
+
 def summarize_code(directory: Path, rel_filepath: Path, docstrings: bool = False) -> str:
     """
-    Given a filepath, returns a formatted string that summarizes all public functions 
-    and classes defined in the file. Each function and class is described with its name, 
+    Given a filepath, returns a formatted string that summarizes all public functions
+    and classes defined in the file. Each function and class is described with its name,
     arguments, and docstring, and the string is separated with newlines.
-    
+
     Args:
         rel_filepath: The path of the file to summarize relative to the root directory.
         directory: The root directory.
-    
+
     Returns:
         A formatted summary string of all public functions and classes, with docstrings.
     """
     with open(directory / rel_filepath) as f:
         root = ast.parse(f.read())
 
-    funcs_and_classes = [f"{rel_filepath}:"]
+    code_summary = [f"{rel_filepath}:"]
+    # Classes
     for node in root.body:
-        if isinstance(node, ast.FunctionDef):
-            if node.name.startswith("_"):
-                continue
-            func_args = [arg.arg for arg in node.args.args]
-            if docstrings:
-                func_doc = ast.get_docstring(node) or ""
-                if func_doc != "":
-                    func_doc = f"\n'''\n{func_doc}\n'''".replace("\n", "\n\t")
-            else:
-                func_doc = ""
-            funcs_and_classes.append(f"\t{node.name}({', '.join(func_args)}){func_doc}")
-        elif isinstance(node, ast.ClassDef):
-            if node.name.startswith("_"):
-                continue
+        if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
             if docstrings:
                 class_doc = ast.get_docstring(node) or ""
                 if class_doc != "":
                     class_doc = f"\n{class_doc}".replace("\n", "\n\t")
             else:
                 class_doc = ""
-            funcs_and_classes.append(f"\t{node.name}:{class_doc}")
-            for item in node.body:
-                if isinstance(item, ast.FunctionDef):
-                    if item.name.startswith("_"):
-                        continue
-                    func_args = ["self"] + [arg.arg for arg in item.args.args[1:]]
-                    if docstrings:
-                        func_doc = ast.get_docstring(item) or ""
-                        if func_doc != "":
-                            func_doc = f"\n{func_doc}".replace("\n", "\n\t\t")
-                    else:
-                        func_doc = ""
-                    funcs_and_classes.append(
-                        f"\t\t{item.name}({', '.join(func_args)}){func_doc}"
-                    )
+            bases = [base.id for base in node.bases if isinstance(base, ast.Name)]
+            bases_str = "" if len(bases) == 0 else f"({', '.join(bases)})"
+            decorators = [f"@{d.id}" for d in node.decorator_list if isinstance(d, ast.Name)]
+            dec_str = "" if len(decorators) == 0 else '\t' + '\n\t'.join(decorators) + '\n'
+            code_summary.append(f"{dec_str}\tclass {node.name}{bases_str}:{class_doc}")
+            # Members
+            code_summary += __get_ast_members(node, tabs=2)
+            # Methods
+            code_summary += [
+                __get_ast_function(item, docstrings, tabs=2)
+                for item in node.body
+                if isinstance(item, ast.FunctionDef)
+                and not item.name.startswith("_")
+            ]
+    # Functions
+    code_summary += [
+        __get_ast_function(node, docstrings, tabs=1)
+        for node in root.body
+        if isinstance(node, ast.FunctionDef)
+        and not node.name.startswith("_")
+    ]
+    return "\n".join(code_summary) + "\n\n"
 
-    return "\n".join(funcs_and_classes) + "\n\n"
 
+def summarize_codebase(docstrings: bool = False) -> str:
+    """
+    Summarizes all public functions and classes defined in the current directory.
 
-# Feed a directory of code files to GPT
-def summarize_codebase() -> str:
+    Args:
+        docstrings: Whether to include docstrings in the summary.
+
+    Returns:
+        A formatted summary string of all code, with optional docstrings.
+    """
     directory = Path(os.getcwd())
     codebase_summary = ""
     for root, _, filenames in os.walk(directory):
@@ -95,26 +151,26 @@ def summarize_codebase() -> str:
             if not filename.endswith(".py"): continue
             filepath = os.path.join(root, filename)
             rel_filepath = Path(filepath).resolve().relative_to(directory)
-            print(f"Summarizing file: {rel_filepath}", colors.info)
-            file_summary = summarize_code(directory, rel_filepath)
+            print(f"Summarizing file: {rel_filepath}", Colors.info)
+            file_summary = summarize_code(directory, rel_filepath, docstrings)
             codebase_summary += file_summary
     return codebase_summary
 
 
 # TODO: work in progress
 def suggest_code(log: Log, model: str, temperature: float) -> None:
-    print(f"GPT is suggesting code based on your conversation with {model}.\n", colors.info)
+    print(f"GPT is suggesting code based on your conversation with {model}.\n", Colors.info)
     generated_code = generate_code(log, model, temperature)
-    print(f"GPT suggested the following code:\n{generated_code}\n", colors.info)
+    print(f"GPT suggested the following code:\n{generated_code}\n", Colors.info)
     response = input("Would you like to accept this code? (y/n): ").strip().lower()
     if response == "y":
         filename = input("Please enter a filename for this code (include the .py extension): ").strip()
         filepath = os.path.join(os.getcwd(), filename)
         with open(filepath, "w") as f:
             f.write(generated_code)
-            print(f"Wrote generated code to {filepath}", colors.info)
+            print(f"Wrote generated code to {filepath}", Colors.info)
     else:
-        print("No code was saved.", colors.info)
+        print("No code was saved.", Colors.info)
 
 
 # TODO: work in progress

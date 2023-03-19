@@ -1,7 +1,7 @@
 from typing import NamedTuple
 
 
-class colors(NamedTuple):
+class Colors(NamedTuple):
     info = "blue"
     user = "green"
     gpt = "magenta"

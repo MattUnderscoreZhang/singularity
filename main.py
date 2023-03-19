@@ -7,7 +7,7 @@ from pathlib import Path
 from termcolor import colored
 
 from gpt_assist.code import show_code, summarize_codebase
-from gpt_assist.color_scheme import colors
+from gpt_assist.color_scheme import Colors
 from gpt_assist.gpt import gpt_api
 from gpt_assist.logs import Log, Message, print
 
@@ -40,23 +40,26 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             "/log: show the conversation log\n"
             "/clear: clear log\n"
             "/code: upload codebase from current directory\n"
+            # TODO: add terminal autocompletion for files
             "/show <filepath>:<class>:<function> show code snippet\n"
                 "    Examples:\n"
                 "    /show main.py:Dog:bark\n"
                 "    /show main.py::list_animals\n"
                 "    /show main.py:Cat:\n"
             "/back: rewind chat to previous user message\n",
-            colors.info
+            # TODO: add /write to take last code and call write_code
+            # TODO: add /load function
+            Colors.info
         )
         return LoopStatus.Continue
     elif user_input == "/log":
-        print(log, colors.info)
-        print(f"Log contains {log.length} tokens.", colors.alert)
+        print(log, Colors.info)
+        print(f"Log contains {log.length} tokens.", Colors.alert)
         print()
         return LoopStatus.Continue
     elif user_input == "/clear":
         log.log = []
-        print("Log cleared.", colors.alert)
+        print("Log cleared.", Colors.alert)
         print()
         return LoopStatus.Continue
     elif user_input.startswith("/code"):
@@ -78,10 +81,11 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             persist=True,
         )
         log.append(message)
-        print(f"Log contains {log.length} tokens.", colors.info)
+        print(f"Log contains {log.length} tokens.", Colors.info)
         print()
         return LoopStatus.Continue
     elif user_input.startswith("/show"):
+        # TODO: add error handling
         directory = Path(os.getcwd())
         show_args = user_input.split()[1].split(':')
         code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
@@ -90,7 +94,7 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             content="```\n" + code + "```",
         )
         log.append(message)
-        print(message, colors.info)
+        print(message, Colors.info)
         return LoopStatus.Continue
     elif user_input == "/back":
         while log.length > 0:
@@ -110,12 +114,12 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
 
 def parse_gpt_response(response: str, log: Log) -> LoopStatus:
     if response.startswith('/show'):
-        user_input = input(colored("Show GPT code? (y/n): ", colors.user))
+        user_input = input(colored("Show GPT code? (y/n): ", Colors.user))
         if user_input.lower() == "y":
             directory = Path(os.getcwd())
             show_args = response.split()[1].split(':')
             code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
-            print(code, colors.info)
+            print(code, Colors.info)
             log.append(
                 Message(
                     role="user",
@@ -138,18 +142,18 @@ def main():
     print(
         f"You are now talking to the {args.model} GPT model. "
         "Enter '/exit' to end the conversation or '/help' for help.\n",
-        colors.info
+        Colors.info
     )
     log = Log(args.model)
     while True:
-        user_input = input(colored("You: ", colors.user))
+        user_input = input(colored("You: ", Colors.user))
         loop_status = parse_user_input(user_input, log)
         if loop_status == LoopStatus.Break:
             break
         elif loop_status == LoopStatus.Continue:
             continue
         response = gpt_api(log.to_messages(), args.model, args.temperature)
-        print(f"\nGPT: {response}\n", colors.gpt, indent=2)
+        print(f"\nGPT: {response}\n", Colors.gpt, indent=2)
         log.append(
             Message(
                 role="assistant",

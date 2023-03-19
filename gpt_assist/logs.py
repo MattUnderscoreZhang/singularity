@@ -5,7 +5,7 @@ import textwrap
 import tiktoken
 from typing import Any, Dict, List
 
-from gpt_assist.color_scheme import colors
+from gpt_assist.color_scheme import Colors
 from gpt_assist.gpt import gpt_api
 
 
@@ -29,6 +29,7 @@ class Log:
         self.log.append(message)
         if self.length > self.prune_trigger:
             self.prune()
+        # autosave
 
     def __str__(self) -> str:
         return "\n".join([str(message) for message in self.log])
@@ -38,6 +39,9 @@ class Log:
         if new_log.length > self.prune_trigger:
             new_log.prune()
         return new_log
+        # autosave
+
+    # add save function
 
     @property
     def length(self) -> int:
@@ -89,7 +93,7 @@ class Log:
         return messages
 
 
-def print(content: Any = "", color: str = colors.info, indent: int = 0):
+def print(content: Any = "", color: str = Colors.info, indent: int = 0):
     content = str(content)
     wrapper = textwrap.TextWrapper(
         initial_indent=" " * indent,
@@ -100,4 +104,4 @@ def print(content: Any = "", color: str = colors.info, indent: int = 0):
     for i, part in enumerate(parts):
         # if i % 2 == 0: builtins.print(colored(wrapper.fill(part), color))
         if i % 2 == 0: builtins.print(colored(part, color))
-        else: builtins.print(colored(part, colors.code))
+        else: builtins.print(colored(part, Colors.code))
