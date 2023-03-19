@@ -8,9 +8,16 @@ from gpt_assist.logs import Log, print
 
 
 def show_code(directory: Path, rel_filepath: Path, cls_name: str, fn_name: str) -> str:
-    with open(directory / rel_filepath) as f:
-        file_contents = f.read()
-        root = ast.parse(file_contents)
+    try:
+        with open(directory / rel_filepath) as f:
+            file_contents = f.read()
+            root = ast.parse(file_contents)
+    except IsADirectoryError:
+        print(f"Path is a directory: {rel_filepath}\n", Colors.info)
+        return ""
+    except FileNotFoundError:
+        print(f"File not found: {rel_filepath}\n", Colors.info)
+        return ""
 
     if cls_name == "" and fn_name == "":
         return file_contents

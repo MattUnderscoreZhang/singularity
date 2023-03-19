@@ -66,7 +66,6 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         print()
         return LoopStatus.Continue
     elif user_input.startswith("/show"):
-        # TODO: add error handling
         directory = Path(os.getcwd())
         show_args = user_input.split()[1].split(':')
         code = (
@@ -74,12 +73,13 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             if len(show_args) == 3
             else show_code(directory, Path(show_args[0]), "", "")
         )
-        message = Message(
-            role="user",
-            content="```\n" + code + "```",
-        )
-        log.append(message)
-        print(message, Colors.info)
+        if code != "":
+            message = Message(
+                role="user",
+                content="```\n" + code + "```",
+            )
+            log.append(message)
+            print(message, Colors.info)
         return LoopStatus.Continue
     elif user_input == "/undo":
         while log.length > 0:
@@ -87,6 +87,10 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             if message.role == "user":
                 break
         print(f"Rewound to state of last message.", Colors.info)
+        print()
+        return LoopStatus.Continue
+    elif user_input.startswith('/'):
+        print(f"Invalid command.", Colors.info)
         print()
         return LoopStatus.Continue
     else:

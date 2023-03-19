@@ -12,7 +12,7 @@ commands = [
     ("/clear", "clear log"),
     ("/code", "upload codebase from current directory"),
     ("/show", "[filepath]:[optional-class]:[optional-function] show code snippet"),
-    ("/undo", "rewind chat to previous user message"),
+    ("/undo", "delete last user message"),
 ]
 
 
@@ -23,22 +23,25 @@ class CommandCompleter(Completer):
         current_word = document.get_word_under_cursor()
 
         # Suggest filepaths if "/show" is typed
-        if words_before_cursor[0] == "/show":
+        if (
+            (len(words_before_cursor) == 1 and current_word == "")
+            or
+            (len(words_before_cursor) == 2 and words_before_cursor[0] == "/show")
+        ):
             path = "".join(words_before_cursor[1:])
-            if path:
-                suggestions = [
-                    Completion(
-                        suggestion,
-                        start_position=-len(path),
-                        display=suggestion,
-                        display_meta="",
-                    ) for suggestion in glob.glob(path + "*")
-                ]
-                for suggestion in suggestions:
-                    yield suggestion
+            suggestions = [
+                Completion(
+                    suggestion,
+                    start_position=-len(path),
+                    display=suggestion,
+                    display_meta="",
+                ) for suggestion in glob.glob(path + "*")
+            ]
+            for suggestion in suggestions:
+                yield suggestion
 
         # Command suggestions
-        elif len(words_before_cursor) == 1 and words_before_cursor[-1].startswith('/'):
+        elif len(words_before_cursor) == 1 and words_before_cursor[0].startswith('/'):
             for command, description in [
                 c for c in commands
                 if c[0].startswith(words_before_cursor[-1])
