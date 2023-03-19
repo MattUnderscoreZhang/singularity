@@ -2,6 +2,7 @@ import builtins
 from dataclasses import dataclass, field
 from termcolor import colored
 import textwrap
+import tiktoken
 from typing import Any, Dict, List
 
 from gpt_assist.color_scheme import colors
@@ -12,20 +13,17 @@ from gpt_assist.gpt import gpt_api
 class Message:
     role: str
     content: str
-    preamble: bool = False
+    persist: bool = False
 
     def __str__(self) -> str:
         return f"{self.role}: {self.content}"
 
-    @property
-    def length(self) -> int:
-        return len(self.content)
-
 
 @dataclass
 class Log:
+    model: str
     log: List[Message] = field(default_factory=list)
-    prune_trigger: int = 3000
+    prune_trigger: int = 3500
 
     def append(self, message: Message):
         self.log.append(message)
@@ -36,24 +34,31 @@ class Log:
         return "\n".join([str(message) for message in self.log])
 
     def __add__(self, other: "Log") -> "Log":
-        new_log = Log(self.log + other.log)
+        new_log = Log(self.model, self.log + other.log)
         if new_log.length > self.prune_trigger:
             new_log.prune()
         return new_log
 
     @property
     def length(self) -> int:
-        return sum([message.length for message in self.log])
+        enc = tiktoken.encoding_for_model(self.model)
+        return sum([
+            len(enc.encode(message.content))
+            for message in self.log
+        ])
 
     def __iter__(self):
         return iter(self.log)
+
+    def pop(self) -> Message:
+        return self.log.pop()
 
     def prune(self):
         """Prune the log to a reasonable number of tokens."""
         messages = [
             message
             for message in self.log
-            if not message.preamble
+            if not message.persist
         ]
         messages.append(
             Message(
@@ -65,12 +70,12 @@ class Log:
                 ),
             )
         )
-        summary = gpt_api(Log(messages).to_messages(), "gpt-3.5-turbo", 1)
+        summary = gpt_api(Log(self.model, messages).to_messages(), self.model, 1)
         new_log = [
             message
             for message in self.log
-            if message.preamble
-        ] + [Message(role="user", content=summary)] + self.log[:-5]
+            if message.persist
+        ] + [Message(role="user", content=summary)] + self.log[-5:]
         self.log = new_log
 
     def to_messages(self) -> List[Dict]:

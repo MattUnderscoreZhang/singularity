@@ -44,7 +44,8 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
                 "    Examples:\n"
                 "    /show main.py:Dog:bark\n"
                 "    /show main.py::list_animals\n"
-                "    /show main.py:Cat:\n",
+                "    /show main.py:Cat:\n"
+            "/back: rewind chat to previous user message\n",
             colors.info
         )
         return LoopStatus.Continue
@@ -62,18 +63,19 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         codebase_summary = summarize_codebase()
         message = Message(
             role="user",
-            content=(
-                "```\n" + codebase_summary + "```" +
-                "This is a high-level codebase overview. You will need to see code in more detail "
-                "in order to answer questions. To do so, use the following command. Do not include "
-                "any additional text or quotes when running the command.\n\n"
-                "/show <filepath>:<class>:<function>\n\n"
-                "Examples:\n"
-                "/show main.py:Dog:bark\n"
-                "/show main.py::list_animals\n"
-                "/show main.py:Cat:\n"
-            ),
-            preamble=True,
+            content="```\n" + codebase_summary + "```",
+            # content=(
+                # "```\n" + codebase_summary + "```" +
+                # "This is a high-level codebase overview. You will need to see code in more detail "
+                # "in order to answer questions. To do so, use the following command. Do not include "
+                # "any additional text or quotes when running the command.\n\n"
+                # "/show <filepath>:<class>:<function>\n\n"
+                # "Examples:\n"
+                # "/show main.py:Dog:bark\n"
+                # "/show main.py::list_animals\n"
+                # "/show main.py:Cat:\n"
+            # ),
+            persist=True,
         )
         log.append(message)
         print(f"Log contains {log.length} tokens.", colors.info)
@@ -85,11 +87,16 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
         message = Message(
             role="user",
-            content="```\n" + code + "\n```\n",
+            content="```\n" + code + "```",
         )
         log.append(message)
         print(message, colors.info)
-        print()
+        return LoopStatus.Continue
+    elif user_input == "/back":
+        while log.length > 0:
+            message = log.pop()
+            if message.role == "user":
+                break
         return LoopStatus.Continue
     else:
         log.append(
@@ -133,7 +140,7 @@ def main():
         "Enter '/exit' to end the conversation or '/help' for help.\n",
         colors.info
     )
-    log = Log()
+    log = Log(args.model)
     while True:
         user_input = input(colored("You: ", colors.user))
         loop_status = parse_user_input(user_input, log)
