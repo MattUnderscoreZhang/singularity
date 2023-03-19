@@ -5,14 +5,29 @@ from pathlib import Path
 from gpt_assist.logs import Log, Message, print
 
 
-def load_code(directory: Path, rel_filepath: Path) -> str:
-    message = f"{rel_filepath}:\n\n"
+def show_code(directory: Path, rel_filepath: Path, cls_name: str, fn_name: str) -> str:
     with open(directory / rel_filepath) as f:
-        message += f.read()
-    return message
+        root = ast.parse(f.read())
+
+    if cls_name == "":
+        for node in root.body:
+            if isinstance(node, ast.FunctionDef):
+                if node.name == fn_name:
+                    return ast.unparse(node)
+    else:
+        for node in root.body:
+            if isinstance(node, ast.ClassDef):
+                if node.name == cls_name:
+                    if fn_name == "":
+                        return ast.unparse(node)
+                    for subnode in node.body:
+                        if isinstance(subnode, ast.FunctionDef):
+                            if subnode.name == fn_name:
+                                return ast.unparse(subnode)
+    return "Code not found."
 
 
-def summarize_code(directory: Path, rel_filepath: Path) -> str:
+def summarize_code(directory: Path, rel_filepath: Path, docstrings: bool = False) -> str:
     """
     Given a filepath, returns a formatted string that summarizes all public functions 
     and classes defined in the file. Each function and class is described with its name, 
@@ -34,25 +49,34 @@ def summarize_code(directory: Path, rel_filepath: Path) -> str:
             if node.name.startswith("_"):
                 continue
             func_args = [arg.arg for arg in node.args.args]
-            func_doc = ast.get_docstring(node) or ""
-            if func_doc != "":
-                func_doc = f"\n'''\n{func_doc}\n'''".replace("\n", "\n\t")
+            if docstrings:
+                func_doc = ast.get_docstring(node) or ""
+                if func_doc != "":
+                    func_doc = f"\n'''\n{func_doc}\n'''".replace("\n", "\n\t")
+            else:
+                func_doc = ""
             funcs_and_classes.append(f"\t{node.name}({', '.join(func_args)}){func_doc}")
         elif isinstance(node, ast.ClassDef):
             if node.name.startswith("_"):
                 continue
-            class_doc = ast.get_docstring(node) or ""
-            if class_doc != "":
-                class_doc = f"\n{class_doc}".replace("\n", "\n\t")
+            if docstrings:
+                class_doc = ast.get_docstring(node) or ""
+                if class_doc != "":
+                    class_doc = f"\n{class_doc}".replace("\n", "\n\t")
+            else:
+                class_doc = ""
             funcs_and_classes.append(f"\t{node.name}:{class_doc}")
             for item in node.body:
                 if isinstance(item, ast.FunctionDef):
                     if item.name.startswith("_"):
                         continue
                     func_args = ["self"] + [arg.arg for arg in item.args.args[1:]]
-                    func_doc = ast.get_docstring(item) or ""
-                    if func_doc != "":
-                        func_doc = f"\n{func_doc}".replace("\n", "\n\t\t")
+                    if docstrings:
+                        func_doc = ast.get_docstring(item) or ""
+                        if func_doc != "":
+                            func_doc = f"\n{func_doc}".replace("\n", "\n\t\t")
+                    else:
+                        func_doc = ""
                     funcs_and_classes.append(
                         f"\t\t{item.name}({', '.join(func_args)}){func_doc}"
                     )
@@ -76,10 +100,15 @@ def summarize_codebase() -> Message:
     message = Message(
         role="user",
         content=(
-            "I'm going to summarize some code for you, then ask you questions afterwards. "
-            "If during conversation I refer to specific code that you want to see, please "
-            "ask me to show it to you.\n\n" +
-            codebase_summary
+            "'''\n" + codebase_summary + "\n'''\n\n" +
+            "This is a high-level codebase overview. You will need to see code in more detail "
+            "in order to answer questions. To do so, use the following command. Do not include "
+            "any additional text or quotes when running the command.\n\n"
+            "/show <filepath>:<class>:<function>\n\n"
+            "Examples:\n"
+            "/show main.py:Dog:bark\n"
+            "/show main.py::list_animals\n"
+            "/show main.py:Cat:\n"
         ),
         preamble=True,
     )

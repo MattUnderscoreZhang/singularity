@@ -1,11 +1,12 @@
 import argparse
+from enum import Enum, auto
 from dotenv import load_dotenv
 import openai
 import os
 from pathlib import Path
 from termcolor import colored
 
-from gpt_assist.code import load_code, summarize_codebase
+from gpt_assist.code import show_code, summarize_codebase
 from gpt_assist.gpt import gpt_api
 from gpt_assist.logs import Log, Message, print
 
@@ -22,6 +23,88 @@ parser.add_argument("--temperature", type=float, default=1, help="Sampling tempe
 args = parser.parse_args()
 
 
+class LoopStatus(Enum):
+    Break = auto()
+    Continue = auto()
+    NoAction = auto()
+
+
+def parse_user_input(user_input: str, log: Log) -> LoopStatus:
+    if user_input == "/exit":
+        return LoopStatus.Break
+    elif user_input == "/help":
+        print(
+            "/exit: end the conversation\n"
+            "/help: show this help message\n"
+            "/log: show the conversation log\n"
+            "/code: upload codebase from current directory\n"
+            "/show <filepath>:<class>:<function> show code snippet\n"
+                "    Examples:\n"
+                "    /show main.py:Dog:bark\n"
+                "    /show main.py::list_animals\n"
+                "    /show main.py:Cat:\n"
+        )
+        return LoopStatus.Continue
+    elif user_input == "/log":
+        print(log)
+        print(f"Log contains {log.length} tokens.", "yellow")
+        print()
+        return LoopStatus.Continue
+    elif user_input.startswith("/code"):
+        message = summarize_codebase()
+        log.append(message)
+        print(f"Log contains {log.length} tokens.", "yellow")
+        print()
+        print(log)
+        return LoopStatus.Continue
+    elif user_input.startswith("/show"):
+        directory = Path(os.getcwd())
+        show_args = user_input.split()[1].split(':')
+        code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
+        print(code)
+        log.append(
+            Message(
+                role="user",
+                content=code,
+            )
+        )
+        return LoopStatus.Continue
+    else:
+        log.append(
+            Message(
+                role="user",
+                content=user_input.strip(),
+            )
+        )
+        return LoopStatus.NoAction
+
+
+def parse_gpt_response(response: str, log: Log) -> LoopStatus:
+    if response.startswith('/show'):
+        user_input = input(colored("Show GPT code? (y/n): ", "cyan"))
+        if user_input.lower() == "y":
+            directory = Path(os.getcwd())
+            show_args = response.split()[1].split(':')
+            code = show_code(directory, Path(show_args[0]), show_args[1], show_args[2])
+            print(code)
+            log.append(
+                Message(
+                    role="user",
+                    content=code,
+                )
+            )
+        else:
+            log.append(
+                Message(
+                    role="user",
+                    content="Access denied.",
+                )
+            )
+        return LoopStatus.NoAction
+    else:
+        return LoopStatus.NoAction
+
+
 def main():
     print(
         f"You are now talking to the {args.model} GPT model. "
@@ -30,44 +113,11 @@ def main():
     log = Log()
     while True:
         user_input = input(colored("You: ", "green"))
-        if user_input == "/exit":
+        loop_status = parse_user_input(user_input, log)
+        if loop_status == LoopStatus.Break:
             break
-        elif user_input == "/help":
-            print(
-                "/exit: end the conversation\n"
-                "/help: show this help message\n"
-                "/log: show the conversation log\n"
-                "/code: upload codebase from current directory\n"
-                "/upload: upload code (relative filepath)\n"
-            )
+        elif loop_status == LoopStatus.Continue:
             continue
-        elif user_input == "/log":
-            print(log)
-            print(f"Log contains {log.length} tokens.")
-            continue
-        elif user_input.startswith("/code"):
-            message = summarize_codebase()
-            log += Log([message])
-            print(f"Log contains {log.length} tokens.")
-            print()
-            print(log)
-            continue
-        elif user_input.startswith("/upload"):
-            directory = Path(os.getcwd())
-            rel_filepath = Path(user_input.split()[1])
-            log.append(
-                Message(
-                    role="user",
-                    content=load_code(directory, rel_filepath)
-                )
-            )
-        else:
-            log.append(
-                Message(
-                    role="user",
-                    content=user_input.strip(),
-                )
-            )
         response = gpt_api(log.to_messages(), args.model, args.temperature)
         print(f"\nGPT: {response}\n", "yellow", indent=2)
         log.append(
@@ -76,8 +126,7 @@ def main():
                 content=response.strip(),
             )
         )
-
-
+        parse_gpt_response(response, log)
 
 
 if __name__ == "__main__":
