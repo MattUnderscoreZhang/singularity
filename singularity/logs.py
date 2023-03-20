@@ -17,6 +17,7 @@ class Log:
     model: str
     log: List[Message] = field(default_factory=list)
     prune_trigger: int = 3500
+    after_prune_threshold: int = 1500
     filename: Optional[str] = None
     title: Optional[str] = None
 
@@ -38,7 +39,7 @@ class Log:
         return self
 
     def __save__(self):
-        save_dir = Path(os.getcwd()) / "saved_logs"
+        save_dir = Path(os.getcwd()) / "singularity_logs"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         if self.filename is None:
@@ -60,6 +61,7 @@ class Log:
             self.model = loaded_log.model
             self.log = loaded_log.log
             self.prune_trigger = loaded_log.prune_trigger
+            self.after_prune_threshold = loaded_log.after_prune_threshold
             self.filename = loaded_log.filename
             self.title = loaded_log.title
         print(f"Loaded '{loaded_log.title}'", Colors.alert)
@@ -134,7 +136,7 @@ class Log:
             n_messages_kept = 0
             messages.pop()
             kept_messages_length = len(enc.encode(messages[-1].content))
-            while kept_messages_length + new_log_length < self.prune_trigger:
+            while kept_messages_length + new_log_length < self.after_prune_threshold:
                 n_messages_kept += 1
                 kept_messages_length += len(enc.encode(messages[-n_messages_kept-1].content))
             min_messages_kept = 3

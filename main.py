@@ -1,10 +1,25 @@
 import argparse
 from enum import Enum, auto
+from typing import List
 from dotenv import load_dotenv
 import openai
 import os
 from pathlib import Path
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.application import Application
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.layout import Float, FloatContainer, HSplit, Layout, ScrollablePane, VSplit
+from prompt_toolkit.layout.containers import Window
+from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.shortcuts import input_dialog
+from prompt_toolkit.widgets import (
+    Button,
+    Checkbox,
+    Dialog,
+    Label,
+    TextArea,
+)
 
 from singularity.autocomplete import prompt
 from singularity.code import show_code, summarize_codebase
@@ -19,8 +34,8 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Define command-line arguments
 parser = argparse.ArgumentParser(description="Talk to LLM assistant")
-# parser.add_argument("--model", type=str, default="gpt-4", help="model to use")
-parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="model to use")
+parser.add_argument("--model", type=str, default="gpt-4", help="model to use")
+# parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="model to use")
 # parser.add_argument("--model", type=str, default="text-davinci-003", help="model to use")
 parser.add_argument("--temperature", type=float, default=1, help="Sampling temperature for generating text")
 args = parser.parse_args()
@@ -32,9 +47,80 @@ class LoopStatus(Enum):
     NoAction = auto()
 
 
+def file_checkbox_dialog(files: List[str]):
+    # TODO: get this working
+    key_bindings = KeyBindings()
+
+    @key_bindings.add('tab')
+    def _(event):
+        event.app.layout.focus_next()
+
+    @key_bindings.add('s-tab')
+    def _(event):
+        event.app.layout.focus_previous()
+
+    checkboxes = [(Checkbox(""), file) for file in files]
+    check_actions = [Checkbox("Summary") for _ in range(len(files))]
+    check_printouts = [Checkbox("Printout") for _ in range(len(files))]
+    
+    file_controls = [HSplit([Label(f, style='fg:red'), c], padding=1) for c, f in checkboxes]
+    action_controls = [HSplit([Label("Summary"), a], padding=1) for a in check_actions]
+    printout_controls = [HSplit([Label("Printout"), p], padding=1) for p in check_printouts]
+    
+    scrollable_body = ScrollablePane(
+        # HSplit(
+            # [
+                # VSplit(file_controls, padding=1),
+                # VSplit(action_controls, padding=1),
+                # VSplit(printout_controls, padding=1)
+            # ],
+            # padding=1
+        # )
+        file_controls[0]
+    )
+
+    def ok_handler():
+        selected_files = [
+            f
+            for a, p, f
+            in zip(check_actions, check_printouts, files)
+            if a.checked or p.checked
+        ]
+        summaries = [f for a, f in zip(check_actions, files) if a.checked]
+        printouts = [f for p, f in zip(check_printouts, files) if p.checked]
+
+        print(selected_files)
+        print(summaries)
+        print(printouts)
+        app.exit()
+
+    def cancel_handler():
+        app.exit()
+
+    ok_button = Button(text="OK", handler=ok_handler)
+    cancel_button = Button(text="Cancel", handler=cancel_handler)
+    dialog = Dialog(
+        title="Select files to include",
+        body=scrollable_body,
+        buttons=[ok_button, cancel_button],
+        width=None,
+    )
+    app = Application(
+        layout=Layout(dialog),
+        full_screen=False,
+        key_bindings=key_bindings,
+        mouse_support=True,
+    )
+    app.run()
+
+
 def parse_user_input(user_input: str, log: Log) -> LoopStatus:
     if user_input == "/exit":
         return LoopStatus.Break
+    # elif user_input == "/browse":
+        # files = [os.path.join(r, f) for r, d, files in os.walk(os.getcwd()) for f in files]
+        # file_checkbox_dialog(files)
+        # return LoopStatus.Continue
     elif user_input == "/log":
         log.print()
         return LoopStatus.Continue
@@ -43,7 +129,7 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         log.rename(name)
         return LoopStatus.Continue
     elif user_input == "/load":
-        save_dir = Path("saved_logs")
+        save_dir = Path("singularity_logs")
         saved_logs = [f for f in os.listdir(save_dir)]
         logs_text = "\n".join([
             f"{i}: {get_title(save_dir / Path(f))}"
@@ -62,6 +148,7 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         log.clear()
         return LoopStatus.Continue
     elif user_input.startswith("/code"):
+        # TODO: switch to a toggle-based system where I flag what to keep in the preamble, and recalculate it every message
         codebase_summary = summarize_codebase()
         message = Message(
             role="user",
@@ -83,6 +170,7 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         print(f"Log contains {log.length} tokens.\n", Colors.info)
         return LoopStatus.Continue
     elif user_input.startswith("/show"):
+        # TODO: switch to a toggle-based system where I flag what to keep in the preamble, and recalculate it every message
         directory = Path(os.getcwd())
         show_args = user_input.split()[1].split(':')
         code = (

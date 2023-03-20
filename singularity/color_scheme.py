@@ -13,7 +13,7 @@ class Colors(NamedTuple):
 prompt_style = Style.from_dict(
     {
         # Default style.
-        "": "#44aa99",
+        "": "#ffdaac",
         # Prompt.
         "username": "#884444 italic",
         "at": "#00aa00",
