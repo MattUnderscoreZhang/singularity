@@ -15,6 +15,7 @@ commands = [
     ("/code", "upload codebase from current directory"),
     ("/show", "[filepath]:[optional-class]:[optional-function] show code snippet"),
     ("/undo", "delete last user message"),
+    ("/set_model", "set LLM model to use"),
     # TODO: implement /issues to look at issue tracker
     # TODO: implement /ask to text user
     # TODO: implement /write <file>:<function_or_class> to overwrite function or class
@@ -39,11 +40,35 @@ class CommandCompleter(Completer):
             path = "".join(words_before_cursor[1:])
             suggestions = [
                 Completion(
-                    suggestion,
+                    suggestion + "/",
                     start_position=-len(path),
                     display=suggestion,
                     display_meta="",
                 ) for suggestion in glob.glob(path + "*")
+            ]
+            for suggestion in suggestions:
+                yield suggestion
+
+        # Suggest models if /set_model is typed
+        elif (
+            (
+                (len(words_before_cursor) == 1 and current_word == "")
+                or (len(words_before_cursor) == 2)
+            )
+            and words_before_cursor[0] == "/set_model"
+        ):
+            model = "".join(words_before_cursor[1:])
+            suggestions = [
+                Completion(
+                    suggestion,
+                    start_position=-len(model),
+                    display=suggestion,
+                    display_meta="",
+                ) for suggestion in [
+                    "gpt-3.5-turbo",
+                    "gpt-4",
+                    "gpt-4-32k",
+                ]
             ]
             for suggestion in suggestions:
                 yield suggestion

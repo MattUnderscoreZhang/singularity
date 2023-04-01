@@ -190,6 +190,10 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
     elif user_input == "/undo":
         log.undo()
         return LoopStatus.Continue
+    elif user_input.startswith("/set_model"):
+        model = user_input.split()[1]
+        log.set_model(model)
+        return LoopStatus.Continue
     elif user_input.startswith('/'):
         print(f"Invalid command.\n", Colors.info)
         return LoopStatus.Continue

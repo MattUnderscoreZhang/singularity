@@ -55,6 +55,11 @@ class Log:
         print(f"Renamed log to {new_name}\n", Colors.alert)
         self.__save__()
 
+    def set_model(self, new_model: str) -> None:
+        self.model = new_model
+        print(f"You are now talking to the {self.model} model.\n")
+        self.__save__()
+
     def load(self, filepath: Path):
         with open(filepath, "rb") as f:
             loaded_log = pk.load(f)
