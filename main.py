@@ -34,8 +34,9 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Define command-line arguments
 parser = argparse.ArgumentParser(description="Talk to LLM assistant")
-parser.add_argument("--model", type=str, default="gpt-4", help="model to use")
-# parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="model to use")
+# parser.add_argument("--model", type=str, default="gpt-4-32k", help="model to use")
+# parser.add_argument("--model", type=str, default="gpt-4", help="model to use")
+parser.add_argument("--model", type=str, default="gpt-3.5-turbo", help="model to use")
 # parser.add_argument("--model", type=str, default="text-davinci-003", help="model to use")
 parser.add_argument("--temperature", type=float, default=1, help="Sampling temperature for generating text")
 args = parser.parse_args()

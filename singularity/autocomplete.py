@@ -15,6 +15,10 @@ commands = [
     ("/code", "upload codebase from current directory"),
     ("/show", "[filepath]:[optional-class]:[optional-function] show code snippet"),
     ("/undo", "delete last user message"),
+    # TODO: implement /issues to look at issue tracker
+    # TODO: implement /ask to text user
+    # TODO: implement /write <file>:<function_or_class> to overwrite function or class
+    # TODO: add /retry <optional-model> to retry with different model
 ]
 
 

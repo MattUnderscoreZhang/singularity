@@ -58,10 +58,10 @@ def __get_ast_function(node: ast.FunctionDef, docstrings: bool, tabs: int) -> st
     if docstrings:
         func_doc = ast.get_docstring(node) or ""
         if func_doc != "":
-            func_doc = f"\n{func_doc}".replace("\n", "\n" + "\t" * tabs)
+            func_doc = f"\n{func_doc}".replace("\n", "\n" + "    " * tabs)
     else:
         func_doc = ""
-    return "\t" * tabs + f"{node.name}({', '.join(func_args)}){func_doc}"
+    return "    " * tabs + f"{node.name}({', '.join(func_args)}){func_doc}"
 
 
 def __get_ast_members(node: ast.ClassDef, tabs: int) -> List[str]:
@@ -73,10 +73,10 @@ def __get_ast_members(node: ast.ClassDef, tabs: int) -> List[str]:
                     continue
                 name = target.id
                 if item.value is None:
-                    member_strs.append("\t" * tabs + name)
+                    member_strs.append("    " * tabs + name)
                 else:
                     value = __get_ast_value(item.value)
-                    member_strs.append("\t" * tabs + f"{name} = {value}")
+                    member_strs.append("    " * tabs + f"{name} = {value}")
         elif isinstance(item, ast.AnnAssign):
             if (
                 not isinstance(item.target, ast.Name)
@@ -86,10 +86,10 @@ def __get_ast_members(node: ast.ClassDef, tabs: int) -> List[str]:
             name = item.target.id
             type = item.annotation.id
             if item.value is None:
-                member_strs.append("\t" * tabs + f"{name}: {type}")
+                member_strs.append("    " * tabs + f"{name}: {type}")
             else:
                 value = __get_ast_value(item.value)
-                member_strs.append("\t" * tabs + f"{name}: {type} = {value}")
+                member_strs.append("    " * tabs + f"{name}: {type} = {value}")
     return member_strs
 
 
@@ -116,14 +116,14 @@ def summarize_code(directory: Path, rel_filepath: Path, docstrings: bool = False
             if docstrings:
                 class_doc = ast.get_docstring(node) or ""
                 if class_doc != "":
-                    class_doc = f"\n{class_doc}".replace("\n", "\n\t")
+                    class_doc = f"\n{class_doc}".replace("\n", "\n    ")
             else:
                 class_doc = ""
             bases = [base.id for base in node.bases if isinstance(base, ast.Name)]
             bases_str = "" if len(bases) == 0 else f"({', '.join(bases)})"
             decorators = [f"@{d.id}" for d in node.decorator_list if isinstance(d, ast.Name)]
-            dec_str = "" if len(decorators) == 0 else '\t' + '\n\t'.join(decorators) + '\n'
-            code_summary.append(f"{dec_str}\tclass {node.name}{bases_str}:{class_doc}")
+            dec_str = "" if len(decorators) == 0 else '    ' + '\n    '.join(decorators) + '\n'
+            code_summary.append(f"{dec_str}    class {node.name}{bases_str}:{class_doc}")
             # Members
             code_summary += __get_ast_members(node, tabs=2)
             # Methods
@@ -168,29 +168,39 @@ def summarize_codebase(docstrings: bool = False) -> str:
 
 
 # TODO: work in progress
-def suggest_code(log: Log, model: str, temperature: float) -> None:
-    print(f"Assistant is suggesting code based on your conversation with {model}.\n", Colors.info)
-    generated_code = generate_code(log, model, temperature)
-    print(f"Assistant suggested the following code:\n{generated_code}\n", Colors.info)
-    response = input("Would you like to accept this code? (y/n): ").strip().lower()
-    if response == "y":
-        filename = input("Please enter a filename for this code (include the .py extension): ").strip()
-        filepath = os.path.join(os.getcwd(), filename)
-        with open(filepath, "w") as f:
-            f.write(generated_code)
-            print(f"Wrote generated code to {filepath}", Colors.info)
-    else:
-        print("No code was saved.", Colors.info)
+def write_code(directory: Path, rel_filepath: Path, cls_name: str, fn_name: str, new_code: str):
+    """
+    Given a filepath, class name, function name, and new code as a string, replaces the
+    specified function or class with the new code and writes the updated file to disk.
 
+    Args:
+        rel_filepath: The path of the file to modify, relative to the root directory.
+        directory: The root directory.
+        cls_name: The name of the class to modify.
+        fn_name: The name of the function to modify.
+        new_code: The replacement code as a string.
+    """
+    with open(directory / rel_filepath) as f:
+        root = ast.parse(f.read())
 
-# TODO: work in progress
-def generate_code(log: Log, model: str, temperature: float) -> str:
-    response = openai.Completion.create(
-        engine=model,
-        prompt='\n'.join([m.content for m in log]),
-        max_tokens=1024,
-        n=1,
-        stop=None,
-        temperature=temperature,
-    )
-    return response.choices[0].text.strip()
+    # Find the class node with the specified name.
+    class_node = None
+    for node in root.body:
+        if isinstance(node, ast.ClassDef) and node.name == cls_name:
+            class_node = node
+            break
+
+    # Find the function node with the specified name.
+    func_node = None
+    for node in class_node.body:
+        if isinstance(node, ast.FunctionDef) and node.name == fn_name:
+            func_node = node
+            break
+
+    # Replace the old function with the new code.
+    new_func_node = ast.parse(new_code).body[0]
+    class_node.body[class_node.body.index(func_node)] = new_func_node
+
+    # Write the updated file to disk.
+    with open(directory / rel_filepath, 'w') as f:
+        f.write(ast.unparse(root))
