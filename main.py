@@ -130,10 +130,9 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
         log.rename(name)
         return LoopStatus.Continue
     elif user_input == "/load":
-        save_dir = Path("singularity_logs")
-        saved_logs = [f for f in os.listdir(save_dir)]
+        saved_logs = [f for f in os.listdir(log.save_dir)]
         logs_text = "\n".join([
-            f"{i}: {get_title(save_dir / Path(f))}"
+            f"{i}: {get_title(log.save_dir / Path(f))}"
             for i, f in enumerate(saved_logs)
         ])  + "\n\nSelect saved log: "
         result = input_dialog(title="Select saved log", text=logs_text).run()
@@ -141,7 +140,7 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
             print("No log loaded.\n", Colors.alert)
         else:
             try:
-                log.load(save_dir / saved_logs[int(result)])
+                log.load(log.save_dir / saved_logs[int(result)])
             except Exception:
                 print("Invalid selection.\n", Colors.alert)
         return LoopStatus.Continue
@@ -239,7 +238,7 @@ def main():
         "Enter '/exit' to end the conversation.\n",
         Colors.info
     )
-    log = Log(args.model)
+    log = Log(model=args.model, save_dir=Path("~/.singularity_logs"))
     while True:
         # no newline
         user_input = prompt("You: ")

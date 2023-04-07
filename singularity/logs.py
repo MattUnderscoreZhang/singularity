@@ -15,6 +15,7 @@ from singularity.llm import Message, llm_api
 @dataclass
 class Log:
     model: str
+    save_dir: Path
     log: List[Message] = field(default_factory=list)
     prune_trigger: int = 3500
     after_prune_threshold: int = 1500
@@ -31,7 +32,11 @@ class Log:
         return "\n".join([str(message) for message in self.log])
 
     def __add__(self, other: "Log") -> "Log":
-        new_log = Log(self.model, self.log + other.log)
+        new_log = Log(
+            model=self.model,
+            save_dir=self.save_dir,
+            log=self.log + other.log,
+        )
         if new_log.length > self.prune_trigger:
             new_log.prune()
         self.log = new_log.log
@@ -39,13 +44,12 @@ class Log:
         return self
 
     def __save__(self):
-        save_dir = Path(os.getcwd()) / "singularity_logs"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
         if self.filename is None:
-            n_saved_logs = len([f for f in os.listdir(save_dir)])
+            n_saved_logs = len([f for f in os.listdir(self.save_dir)])
             self.filename = f"log_{n_saved_logs}"
-        save_path = save_dir / f"{self.filename}.txt"
+        save_path = self.save_dir / f"{self.filename}.txt"
         if self.title is None:
             self.title = self.filename
         pk.dump(self, open(save_path, "wb"))
