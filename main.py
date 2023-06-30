@@ -125,6 +125,19 @@ def parse_user_input(user_input: str, log: Log) -> LoopStatus:
     elif user_input == "/log":
         log.print()
         return LoopStatus.Continue
+    elif user_input == "/copy":
+        message = log.log[-1].content
+        os.system(f'echo "{message}" | pbcopy')
+        return LoopStatus.Continue
+    elif user_input == "/paste":
+        content = os.popen("pbpaste").read().strip()
+        message = Message(
+            role="user",
+            content=content,
+        )
+        log.append(message)
+        print(content + "\n", Colors.info)
+        return LoopStatus.Continue
     elif user_input.startswith("/name"):
         name = " ".join(user_input.split()[1:])
         log.rename(name)
@@ -238,7 +251,7 @@ def main():
         "Enter '/exit' to end the conversation.\n",
         Colors.info
     )
-    log = Log(model=args.model, save_dir=Path("~/.singularity_logs"))
+    log = Log(model=args.model, save_dir=Path.home() / ".singularity_logs")
     while True:
         # no newline
         user_input = prompt("You: ")
@@ -248,7 +261,7 @@ def main():
         elif loop_status == LoopStatus.Continue:
             continue
         response = llm_api(log.log, args.model, args.temperature)
-        print(f"\nassistant: {response}\n", Colors.assistant, indent=2)
+        print(f"\nAssistant: {response}\n", Colors.assistant, indent=2)
         log.append(
             Message(
                 role="assistant",

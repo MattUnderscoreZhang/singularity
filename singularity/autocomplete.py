@@ -16,6 +16,8 @@ commands = [
     ("/show", "[filepath]:[optional-class]:[optional-function] show code snippet"),
     ("/undo", "delete last user message"),
     ("/set_model", "set LLM model to use"),
+    ("/copy", "copy last assistant response to clipboard"),
+    ("/paste", "paste from clipboard"),
     # TODO: implement /issues to look at issue tracker
     # TODO: implement /ask to text user
     # TODO: implement /write <file>:<function_or_class> to overwrite function or class
